@@ -27,7 +27,7 @@ where `E(x) = -0.5 * x^T W x` is the Ising energy and `[...]+ = max(..., eps)` i
 
 The local field for neuron `i` is `h_i = sum_j W_ij * s_j`, computed as `W[i] @ state`. Two activation rules are used in this repo:
 
-- **Mean-field-style (`curved_network.py`, `compare_gamma.py`):** standard sigmoid driven by the effective inverse temperature,
+- **Mean-field-style (`curvednet.py`, `compare_gamma.py`):** standard sigmoid driven by the effective inverse temperature,
 
     ```
     P(s_i = +1) = (1 + tanh(beta_eff * h_i)) / 2
@@ -49,10 +49,10 @@ The local field for neuron `i` is `h_i = sum_j W_ij * s_j`, computed as `W[i] @ 
 Downloads public-domain images from Wikimedia Commons and converts them to 128x128 binary {-1, +1} patterns stored as `.npy` files.
 
 - **Sources**: Great Wave (Hokusai), Mona Lisa (da Vinci)
-- **Output**: `patterns/*.npy` (binary patterns), `patterns/*.png` (previews)
+- **Output**: `data/*.npy` (binary patterns), `data/*.png` (previews)
 - **Method**: Grayscale conversion, resize to 128x128, median-threshold binarization
 
-### `curved_network.py`
+### `curvednet.py`
 
 Single-run curved Hopfield network with configurable `gamma_0`.
 
@@ -82,9 +82,9 @@ Side-by-side comparison of recall dynamics across different `gamma_0` values.
 ├── hopfield_ising_1simple.py # Deterministic Hopfield (32x32, procedural)
 ├── hopfield_ising_2noisy.py  # Stochastic Hopfield (32x32, procedural)
 ├── hopfield_ising.py         # Stochastic Hopfield (128x128, real images)
-├── curved_network.py         # Curved Hopfield, single gamma_0
+├── curvednet.py              # Curved Hopfield, single gamma_0
 ├── compare_gamma.py          # Side-by-side gamma_0 comparison
-├── patterns/
+├── data/
 │   ├── .cache/               # Raw downloaded images
 │   ├── great_wave.npy        # Binary pattern
 │   ├── great_wave.png        # Preview

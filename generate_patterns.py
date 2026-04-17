@@ -20,7 +20,7 @@ SOURCES = {
     ),
 }
 
-OUT_DIR = "patterns"
+OUT_DIR = "data"
 
 
 def download(url: str, dest: str) -> None:

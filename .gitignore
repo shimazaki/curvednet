@@ -10,4 +10,4 @@ wheels/
 .venv
 
 # Generated sampler outputs
-data/
+results/

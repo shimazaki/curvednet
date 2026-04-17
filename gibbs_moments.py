@@ -16,7 +16,7 @@ Accumulates equilibrium moments
     eta_ij = <s_i s_j>
 
 from samples collected after a burn-in. Patterns are downsampled from the
-128x128 .npy files in patterns/ to N_SIDE x N_SIDE so that eta_ij fits
+128x128 .npy files in data/ to N_SIDE x N_SIDE so that eta_ij fits
 comfortably in memory (N_SIDE=32 -> ~4 MB float32).
 """
 
@@ -27,6 +27,8 @@ import sys
 import numpy as np
 from PIL import Image
 
+from curvednet import prob_stay_gamma
+
 # --- Configuration ---
 GAMMA_0 = -0.3          # curvature gamma' (override via CLI: python gibbs_moments.py -0.3)
 BETA = 1.5              # inverse temperature (matches compare_gamma.py)
@@ -36,27 +38,10 @@ BURN_IN = 500           # sweeps discarded before accumulating moments
 SAMPLE_INTERVAL = 1     # sweeps between moment updates (thinning)
 SEED = 42
 
-OUT_DIR = "data"
+OUT_DIR = "results"
 if len(sys.argv) > 1:
     GAMMA_0 = float(sys.argv[1])
 OUT_PATH = os.path.join(OUT_DIR, f"gibbs_moments_g{GAMMA_0:+.2f}.npz")
-
-
-def prob_stay_gamma(z: float, gamma: float) -> float:
-    """Return 1 / (1 + exp_gamma(z)) with exp_gamma(z) = [1 + gamma z]_+^(1/gamma).
-
-    The [.]_+ clipping forbids transitions into states with p_gamma(x) = 0:
-    inner <= 0 maps to exp_gamma -> 0 (gamma > 0) or +inf (gamma < 0).
-    """
-    if abs(gamma) < 1e-12:
-        return 1.0 / (1.0 + np.exp(z))
-    inner = 1.0 + gamma * z
-    if inner <= 0.0:
-        return 1.0 if gamma > 0.0 else 0.0
-    log_expg = np.log(inner) / gamma
-    if log_expg > 700.0:
-        return 0.0
-    return 1.0 / (1.0 + np.exp(log_expg))
 
 
 def load_and_downsample(path: str, n_side: int) -> np.ndarray:
@@ -72,9 +57,9 @@ def load_and_downsample(path: str, n_side: int) -> np.ndarray:
 
 
 def main() -> None:
-    npy_files = sorted(glob.glob("patterns/*.npy"))
+    npy_files = sorted(glob.glob("data/*.npy"))
     if not npy_files:
-        print("No patterns found in patterns/. Run generate_patterns.py first.")
+        print("No patterns found in data/. Run generate_patterns.py first.")
         sys.exit(1)
 
     patterns = [load_and_downsample(f, N_SIDE) for f in npy_files]
