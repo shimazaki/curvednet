@@ -1,7 +1,7 @@
 """Compare recall speed across different curvature parameters gamma_0.
 
 Runs the curved Hopfield network from identical noisy initial states for each
-gamma_0 value, producing a side-by-side GIF (compare_gamma.gif).
+gamma_0 value, producing a side-by-side GIF (fig/compare_gamma.gif).
 """
 
 import glob
@@ -143,7 +143,7 @@ for pat_idx, pat in enumerate(patterns):
         col_images = [all_snaps[g_idx][t] for g_idx in range(len(GAMMAS))]
         frames.append(compose_frame(col_images, GAMMAS))
 
-out_path = "compare_gamma.gif"
+out_path = "fig/compare_gamma.gif"
 frames[0].save(
     out_path, save_all=True, append_images=frames[1:], duration=100, loop=0
 )

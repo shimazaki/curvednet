@@ -58,7 +58,7 @@ frames = []
 for pat in patterns:
     frames.extend(run_cycle(pat))
 
-out_path = "hopfield_recall.gif"
+out_path = "fig/hopfield_recall.gif"
 frames[0].save(
     out_path, save_all=True, append_images=frames[1:], duration=100, loop=0
 )

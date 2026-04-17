@@ -61,7 +61,7 @@ def snap_to_image(s):
 
 # --- Build animated GIF ---
 frames = [snap_to_image(s) for s in snapshots]
-out_path = "hopfield_recall.gif"
+out_path = "fig/hopfield_recall.gif"
 frames[0].save(
     out_path, save_all=True, append_images=frames[1:], duration=300, loop=0
 )

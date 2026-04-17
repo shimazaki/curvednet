@@ -64,7 +64,7 @@ def run_cycle(pattern):
 
 # --- Run two cycles with different initial conditions ---
 frames = run_cycle(patterns[0]) + run_cycle(patterns[1])
-out_path = "hopfield_recall.gif"
+out_path = "fig/hopfield_recall.gif"
 frames[0].save(
     out_path, save_all=True, append_images=frames[1:], duration=300, loop=0
 )

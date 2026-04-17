@@ -47,7 +47,7 @@ Minimal Hopfield network demo with deterministic (zero-temperature) dynamics.
 
 - **Patterns**: Procedurally generated cross and square (32x32)
 - **Update rule**: `s_i = sign(h_i)` (hard threshold, no stochasticity)
-- **Output**: `hopfield_recall.gif`
+- **Output**: `fig/hopfield_recall.gif`
 
 ### `hopfield_ising_2noisy.py`
 
@@ -56,7 +56,7 @@ Stochastic (finite-temperature) Hopfield network with tanh activation.
 - **Patterns**: Same procedural cross and square (32x32)
 - **Update rule**: `P(s_i = +1) = (1 + tanh(beta * h_i)) / 2` (Glauber dynamics)
 - **Parameters**: `beta=2.0`, `N_STEPS=20000`
-- **Output**: `hopfield_recall.gif`
+- **Output**: `fig/hopfield_recall.gif`
 
 ### `hopfield_ising.py`
 
@@ -64,7 +64,7 @@ Stochastic Hopfield network using real image patterns from `patterns/*.npy`.
 
 - **Patterns**: Loaded from `generate_patterns.py` output (128x128)
 - **Parameters**: `beta=3.0`, `N_STEPS=80000`, `NOISE_FRAC=0.30`
-- **Output**: `hopfield_recall.gif`
+- **Output**: `fig/hopfield_recall.gif`
 
 ### `curved_network.py`
 
@@ -73,7 +73,7 @@ Single-run curved Hopfield network with configurable `gamma_0`.
 - **Key addition**: State-dependent `beta_eff` via the curvature formula
 - **Energy tracking**: Incremental energy updates for efficiency (`energy -= delta * h`)
 - **Parameters**: `beta=3.0`, `gamma_0=-1.2`, `N_STEPS=80000`
-- **Output**: `curved_recall.gif`
+- **Output**: `fig/curved_recall.gif`
 
 ### `compare_gamma.py`
 
@@ -81,7 +81,7 @@ Side-by-side comparison of recall dynamics across different `gamma_0` values.
 
 - **Comparison**: Runs multiple `gamma_0` values from identical noisy initial states
 - **RNG synchronization**: Captures and restores RNG state so all runs share the same initial noise
-- **Output**: `compare_gamma.gif` with labeled columns (shows beta and gamma')
+- **Output**: `fig/compare_gamma.gif` with labeled columns (shows beta and gamma')
 - **Parameters** (edit at top of file):
   - `GAMMAS`: list of gamma_0 values to compare (default: `[0.0, -2.0]`)
   - `BETA`: inverse temperature (default: `1.5`)
