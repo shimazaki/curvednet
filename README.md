@@ -1,6 +1,6 @@
 # Curved Hopfield Network
 
-Hopfield network simulations with curved (deformed) dynamics based on [Aguilera et al., *Nature Communications* (2025)](https://doi.org/10.1038/s41467-025-56266-0). The curvature parameter `gamma_0` introduces higher-order interactions that make the effective inverse temperature state-dependent, accelerating or decelerating memory retrieval.
+Hopfield network simulations with curved (deformed) dynamics based on [Aguilera et al., *Nature Communications* (2025)](https://doi.org/10.1038/s41467-025-61475-w). The curvature parameter `gamma_0` introduces higher-order interactions that make the effective inverse temperature state-dependent, accelerating or decelerating memory retrieval.
 
 ## Quickstart
 
@@ -25,11 +25,22 @@ where `E(x) = -0.5 * x^T W x` is the Ising energy and `[...]+ = max(..., eps)` i
 | `= 0`  | Standard Hopfield/Ising model (constant beta) |
 | `> 0`  | Decelerates dynamics, potentially more robust retrieval |
 
-The local field for neuron `i` is `h_i = sum_j W_ij * s_j`, computed as `W[i] @ state`. The spin update probability follows:
+The local field for neuron `i` is `h_i = sum_j W_ij * s_j`, computed as `W[i] @ state`. Two activation rules are used in this repo:
 
-```
-P(s_i = +1) = (1 + tanh(beta_eff * h_i)) / 2
-```
+- **Mean-field-style (`curved_network.py`, `compare_gamma.py`):** standard sigmoid driven by the effective inverse temperature,
+
+    ```
+    P(s_i = +1) = (1 + tanh(beta_eff * h_i)) / 2
+    ```
+
+- **Gamma-deformed conditional (`gibbs_moments.py`, Eq. 8 of Aguilera et al.):** samples `s_i` via the γ-exponential of the energy change for a flip,
+
+    ```
+    P(s_i stays) = 1 / (1 + exp_gamma(-2 * beta_eff * s_i * h_i))
+    exp_gamma(z) = [1 + gamma * z]_+^(1/gamma),   gamma = gamma_0 / (N * beta)
+    ```
+
+    which reduces to the mean-field sigmoid as `gamma_0 -> 0` and matches the exact conditional of the curved joint distribution `p_gamma(x) propto [1 - gamma * beta * E(x)]_+^(1/gamma)`.
 
 ## Scripts
 
@@ -40,31 +51,6 @@ Downloads public-domain images from Wikimedia Commons and converts them to 128x1
 - **Sources**: Great Wave (Hokusai), Mona Lisa (da Vinci)
 - **Output**: `patterns/*.npy` (binary patterns), `patterns/*.png` (previews)
 - **Method**: Grayscale conversion, resize to 128x128, median-threshold binarization
-
-### `hopfield_ising_1simple.py`
-
-Minimal Hopfield network demo with deterministic (zero-temperature) dynamics.
-
-- **Patterns**: Procedurally generated cross and square (32x32)
-- **Update rule**: `s_i = sign(h_i)` (hard threshold, no stochasticity)
-- **Output**: `fig/hopfield_recall.gif`
-
-### `hopfield_ising_2noisy.py`
-
-Stochastic (finite-temperature) Hopfield network with tanh activation.
-
-- **Patterns**: Same procedural cross and square (32x32)
-- **Update rule**: `P(s_i = +1) = (1 + tanh(beta * h_i)) / 2` (Glauber dynamics)
-- **Parameters**: `beta=2.0`, `N_STEPS=20000`
-- **Output**: `fig/hopfield_recall.gif`
-
-### `hopfield_ising.py`
-
-Stochastic Hopfield network using real image patterns from `patterns/*.npy`.
-
-- **Patterns**: Loaded from `generate_patterns.py` output (128x128)
-- **Parameters**: `beta=3.0`, `N_STEPS=80000`, `NOISE_FRAC=0.30`
-- **Output**: `fig/hopfield_recall.gif`
 
 ### `curved_network.py`
 
