@@ -96,6 +96,7 @@ def main() -> None:
 
     eta_i = np.zeros(N, dtype=np.float64)
     eta_ij = np.zeros((N, N), dtype=np.float32)
+    pK = np.zeros(N + 1, dtype=np.int64)  # population spike count histogram
     n_samples = 0
 
     sweeps_per_seg = N_SWEEPS // N_PATTERNS
@@ -127,6 +128,11 @@ def main() -> None:
             if (sweep_idx - 1) % SAMPLE_INTERVAL == 0:
                 eta_i += s
                 eta_ij += np.outer(s, s).astype(np.float32)
+                if BINARY:
+                    k = int(s.sum())
+                else:
+                    k = int((s + 1).sum()) // 2
+                pK[k] += 1
                 n_samples += 1
             if sweep_idx % 100 == 0:
                 print(f"  pattern {p_idx + 1}/{N_PATTERNS}  "
@@ -139,6 +145,7 @@ def main() -> None:
     save_dict = dict(
         eta_i=eta_i,
         eta_ij=eta_ij,
+        pK=pK,
         W=W,
         gamma_0=GAMMA_0,
         beta=BETA,
