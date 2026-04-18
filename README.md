@@ -5,7 +5,7 @@ Hopfield network simulations with curved (deformed) dynamics based on [Aguilera 
 ## Quickstart
 
 ```bash
-uv run python generate_patterns.py   # download & binarize images → data/*.npy
+uv run python generate_patterns.py   # download source images → data/*.jpg
 uv run python example.py             # shortest end-to-end recall demo → fig/curved_recall.gif
 uv run python compare_gamma.py       # side-by-side gamma_0 comparison  → fig/compare_gamma.gif
 uv run python gibbs_moments.py -0.3  # equilibrium moments at gamma_0=-0.3 → results/*.npz
@@ -52,15 +52,14 @@ The local field for neuron `i` is `h_i = sum_j W_ij * s_j`, computed as `W[i] @ 
 
 ### `generate_patterns.py`
 
-Downloads public-domain images from Wikimedia Commons and converts them to 128x128 binary {-1, +1} patterns stored as `.npy` files.
+Downloads public-domain images from Wikimedia Commons to `data/*.jpg`. The shared function `load_patterns(n_side)` converts these JPEGs to binary {-1, +1} arrays at any requested resolution (LANCZOS resize + median threshold). All consumers call `load_patterns()` instead of loading pre-baked `.npy` files.
 
 - **Sources**: Great Wave (Hokusai), Mona Lisa (da Vinci)
-- **Output**: `data/*.npy` (binary patterns), `data/*.png` (previews)
-- **Method**: Grayscale conversion, resize to 128x128, median-threshold binarization
+- **Output**: `data/*.jpg` (source images, gitignored)
 
 ### `example.py`
 
-Shortest end-to-end pipeline (≈60 lines of code) — standalone, no project imports. Loads `data/*.npy`, builds the Hebbian matrix, runs a curved-Glauber Markov chain for each pattern with the exact deformed conditional, and writes `fig/curved_recall.gif`. Byte-identical to `curvednet.py`'s output under the same seed.
+Shortest end-to-end pipeline (≈60 lines of code). Loads patterns via `load_patterns()`, builds the Hebbian matrix, runs a curved-Glauber Markov chain for each pattern with the exact deformed conditional, and writes `fig/curved_recall.gif`. Byte-identical to `curvednet.py`'s output under the same seed.
 
 ### `curvednet.py`
 
@@ -68,7 +67,7 @@ Curved Hopfield module. Importable helpers at module level (no side effects):
 
 | Export | Purpose |
 |---|---|
-| `load_square_patterns` | glob + sorted-load `data/*.npy`, return `(patterns, N_SIDE, N)` |
+| `load_square_patterns` | load patterns via `generate_patterns.load_patterns()`, return `(patterns, N_SIDE, N)` |
 | `hebbian_weights`      | `(1/N) sum_k x_k x_k^T` with zero diagonal |
 | `snap_to_image`        | render a ±1 state as an upscaled grayscale PIL image |
 | `prob_stay_gamma`      | `1 / (1 + exp_gamma(z))` — the γ-logistic primitive |
@@ -103,7 +102,7 @@ eta_ij = <s_i s_j>      (shape (N, N), float32)
 
 after a burn-in. CLI takes `gamma_0` as the first argument (e.g. `gibbs_moments.py -0.3`).
 
-- **Patterns**: downsampled from `data/*.npy` to `N_SIDE x N_SIDE` (default 32×32) so `eta_ij` stays a few MB
+- **Patterns**: converted from `data/*.jpg` at `N_SIDE x N_SIDE` (default 32×32) so `eta_ij` stays a few MB
 - **Activation**: `ACTIVATION = "exact"` by default; set to `"approx"` for the large-N sigmoid
 - **Output**: `results/gibbs_moments_g{+X.XX,-X.XX}.npz` containing `eta_i`, `eta_ij`, plus the config constants
 - **Parameters** (top of file): `BETA`, `N_SWEEPS`, `BURN_IN`, `SAMPLE_INTERVAL`, `SEED`
@@ -139,7 +138,7 @@ Running `uv run python curvednet_binary.py` produces `fig/curved_recall_binary.g
 ├── example.py                # Standalone end-to-end recall demo
 ├── test_curvednet.py         # pytest tests for curvednet
 ├── test_curvednet_binary.py  # pytest tests for curvednet_binary
-├── data/                     # Stored binary patterns (.npy, .png)
+├── data/                     # Downloaded source images (.jpg, gitignored)
 ├── fig/                      # Generated GIFs
 ├── results/                  # Sampler outputs (.npz, gitignored)
 ├── ref/                      # Reference paper PDF
