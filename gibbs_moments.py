@@ -116,10 +116,10 @@ def main() -> None:
     eta_ij /= n_samples
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    np.savez(
-        OUT_PATH,
+    save_dict = dict(
         eta_i=eta_i,
         eta_ij=eta_ij,
+        W=W,
         gamma_0=GAMMA_0,
         beta=BETA,
         n_samples=n_samples,
@@ -127,6 +127,9 @@ def main() -> None:
         burn_in=BURN_IN,
         n_side=N_SIDE,
     )
+    if b is not None:
+        save_dict["b"] = b
+    np.savez(OUT_PATH, **save_dict)
     print(f"Saved {OUT_PATH} (n_samples={n_samples}, gamma_0={GAMMA_0}, beta={BETA})")
 
 
