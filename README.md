@@ -8,7 +8,8 @@ Hopfield network simulations with curved (deformed) dynamics based on [Aguilera 
 uv run python generate_patterns.py   # download source images → data/*.jpg
 uv run python example.py             # shortest end-to-end recall demo → fig/curved_recall.gif
 uv run python compare_gamma.py       # side-by-side gamma_0 comparison  → fig/compare_gamma.gif
-uv run python gibbs_moments.py -0.3  # equilibrium moments at gamma_0=-0.3 → results/*.npz
+uv run python gibbs_moments.py -0.3              # equilibrium moments (32×32) → results/*.npz
+uv run python gibbs_moments.py --size 16 -0.3    # at 16×16 resolution
 uv run python curvednet_binary.py    # binary {0,1} recall demo           → fig/curved_recall_binary.gif
 uv run pytest                        # run the 80 unit tests
 ```
@@ -100,11 +101,11 @@ eta_i  = <s_i>          (shape (N,))
 eta_ij = <s_i s_j>      (shape (N, N), float32)
 ```
 
-after a burn-in. CLI takes `gamma_0` as the first argument (e.g. `gibbs_moments.py -0.3`).
+after a burn-in. CLI takes `gamma_0` as the first positional argument and `--size N` to set resolution (default 32).
 
-- **Patterns**: converted from `data/*.jpg` at `N_SIDE x N_SIDE` (default 32×32) so `eta_ij` stays a few MB
+- **Patterns**: converted from `data/*.jpg` at `N_SIDE x N_SIDE` (default 32×32, override with `--size`) so `eta_ij` stays a few MB
 - **Activation**: `ACTIVATION = "exact"` by default; set to `"approx"` for the large-N sigmoid
-- **Output**: `results/gibbs_moments_g{+X.XX,-X.XX}.npz` containing `eta_i`, `eta_ij`, plus the config constants
+- **Output**: `results/gibbs_moments_n{N}_g{+X.XX}.npz` containing `eta_i`, `eta_ij`, plus the config constants
 - **Parameters** (top of file): `BETA`, `N_SWEEPS`, `BURN_IN`, `SAMPLE_INTERVAL`, `SEED`
 
 ## Binary encoding
