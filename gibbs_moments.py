@@ -64,9 +64,10 @@ OUT_PATH = os.path.join(OUT_DIR, f"gibbs_moments{_suffix}_size{N_SIDE}_g{GAMMA_0
 
 
 def main() -> None:
-    patterns = load_patterns(n_side=N_SIDE)
+    all_patterns = load_patterns(n_side=N_SIDE)
+    patterns = [all_patterns[0]]  # great_wave only
     N = N_SIDE * N_SIDE
-    print(f"Loaded {len(patterns)} patterns ({N_SIDE}x{N_SIDE})")
+    print(f"Using 1 of {len(all_patterns)} patterns ({N_SIDE}x{N_SIDE}): great_wave")
 
     if BINARY:
         W_s = hebbian_weights(patterns, N)
