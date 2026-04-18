@@ -5,9 +5,10 @@ pattern start from a noisy copy and run a curved-Glauber Markov chain with the
 exact deformed conditional (paper S2.5), snapshot the state, and save an
 animated GIF. Reproduces fig/curved_recall.gif from curvednet.py.
 """
-import glob
 import numpy as np
 from PIL import Image
+
+from generate_patterns import load_patterns
 
 # --- Parameters ------------------------------------------------------------
 BETA = 3.0               # inverse temperature
@@ -19,7 +20,7 @@ DISPLAY_SCALE = 8        # nearest-neighbor upscaling for the GIF
 SEED = 42
 
 # --- Load patterns + Hebbian weights --------------------------------------
-patterns = [np.load(f).ravel() for f in sorted(glob.glob("data/*.npy"))]
+patterns = load_patterns()
 N = patterns[0].size
 N_SIDE = int(np.sqrt(N))
 W = sum(np.outer(p, p) for p in patterns) / N

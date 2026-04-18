@@ -9,23 +9,22 @@ equilibrium moments
 
 from samples collected after a burn-in. The `ACTIVATION` constant selects
 the exact deformed conditional (paper S2.5, default) or the large-N
-approximation (S2.7). Patterns are downsampled from the 128x128 .npy files
-in data/ to N_SIDE x N_SIDE so that eta_ij fits comfortably in memory
+approximation (S2.7). Patterns are converted from cached JPEGs at
+N_SIDE x N_SIDE so that eta_ij fits comfortably in memory
 (N_SIDE=32 -> ~4 MB float32).
 """
 
-import glob
 import os
 import sys
 
 import numpy as np
-from PIL import Image
 
 # --- Parse --binary flag before positional args ---
 BINARY = "--binary" in sys.argv
 _argv = [a for a in sys.argv[1:] if a != "--binary"]
 
 from curvednet import hebbian_weights
+from generate_patterns import load_patterns
 if BINARY:
     from curvednet_binary import (
         ising_to_binary,
@@ -52,27 +51,10 @@ _suffix = "_binary" if BINARY else ""
 OUT_PATH = os.path.join(OUT_DIR, f"gibbs_moments{_suffix}_g{GAMMA_0:+.2f}.npz")
 
 
-def load_and_downsample(path: str, n_side: int) -> np.ndarray:
-    """Load a binary {-1,+1} pattern and downsample to n_side x n_side."""
-    arr = np.load(path)
-    side = int(np.sqrt(arr.size))
-    assert side * side == arr.size, f"{path} is not square"
-    img = Image.fromarray(((arr.reshape(side, side) + 1) / 2 * 255).astype(np.uint8), "L")
-    img = img.resize((n_side, n_side), Image.LANCZOS)
-    pixels = np.array(img, dtype=np.float64)
-    threshold = np.median(pixels)
-    return np.where(pixels >= threshold, 1.0, -1.0).ravel()
-
-
 def main() -> None:
-    npy_files = sorted(glob.glob("data/*.npy"))
-    if not npy_files:
-        print("No patterns found in data/. Run generate_patterns.py first.")
-        sys.exit(1)
-
-    patterns = [load_and_downsample(f, N_SIDE) for f in npy_files]
+    patterns = load_patterns(n_side=N_SIDE)
     N = N_SIDE * N_SIDE
-    print(f"Loaded {len(patterns)} patterns (downsampled to {N_SIDE}x{N_SIDE}) from {npy_files}")
+    print(f"Loaded {len(patterns)} patterns ({N_SIDE}x{N_SIDE})")
 
     if BINARY:
         W_s = hebbian_weights(patterns, N)

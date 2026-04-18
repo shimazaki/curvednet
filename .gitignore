@@ -9,5 +9,11 @@ wheels/
 # Virtual environments
 .venv
 
+# Downloaded / generated data
+data/*.jpg
+data/*.npy
+data/*.png
+data/.cache/
+
 # Generated sampler outputs
 results/

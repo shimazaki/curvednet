@@ -1,5 +1,6 @@
 """Download Hokusai ukiyo-e prints and convert to binary {-1,+1} patterns."""
 
+import glob
 import os
 import urllib.request
 
@@ -40,30 +41,30 @@ def to_binary(img_path: str, n: int) -> np.ndarray:
     return np.where(pixels >= threshold, 1.0, -1.0)
 
 
-def save_preview(pattern: np.ndarray, path: str) -> None:
-    pixels = ((pattern + 1) / 2 * 255).astype(np.uint8)
-    Image.fromarray(pixels, "L").save(path)
+def load_patterns(n_side: int = 128, data_dir: str = "data") -> list:
+    """Load JPEGs from data_dir and convert to flat {-1,+1} arrays at any resolution.
+
+    Only images whose stem matches a key in SOURCES are loaded.
+    """
+    paths = sorted(
+        p for p in glob.glob(os.path.join(data_dir, "*.jpg"))
+        if os.path.splitext(os.path.basename(p))[0] in SOURCES
+    )
+    if not paths:
+        raise FileNotFoundError(
+            f"No JPEG images in {data_dir}/. Run generate_patterns.py first."
+        )
+    return [to_binary(p, n_side).ravel() for p in paths]
 
 
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
-    cache_dir = os.path.join(OUT_DIR, ".cache")
-    os.makedirs(cache_dir, exist_ok=True)
 
     for name, url in SOURCES.items():
         print(f"Processing {name}...")
         ext = url.rsplit(".", 1)[-1].split("?")[0]
-        raw_path = os.path.join(cache_dir, f"{name}.{ext}")
+        raw_path = os.path.join(OUT_DIR, f"{name}.{ext}")
         download(url, raw_path)
-
-        pattern = to_binary(raw_path, N_SIDE)
-        npy_path = os.path.join(OUT_DIR, f"{name}.npy")
-        np.save(npy_path, pattern)
-        print(f"  saved: {npy_path}  shape={pattern.shape}")
-
-        png_path = os.path.join(OUT_DIR, f"{name}.png")
-        save_preview(pattern, png_path)
-        print(f"  preview: {png_path}")
 
     print("Done.")
 

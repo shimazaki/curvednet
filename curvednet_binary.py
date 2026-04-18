@@ -14,11 +14,12 @@ Module-level exports are importable with no side effects. Display + GIF
 output runs only under `if __name__ == "__main__":`.
 """
 
-import glob
 import sys
 
 import numpy as np
 from PIL import Image
+
+from generate_patterns import load_patterns
 
 
 # --- Ising <-> Binary translation -------------------------------------------
@@ -61,22 +62,16 @@ def state_binary_to_ising(x):
 # --- Core binary functions ---------------------------------------------------
 
 
-def load_square_patterns(path_glob="data/*.npy"):
-    """Load square {0,1} patterns from .npy files. Returns (patterns, N_SIDE, N).
+def load_square_patterns(n_side=128, data_dir="data"):
+    """Load square {0,1} patterns from cached JPEGs. Returns (patterns, N_SIDE, N).
 
-    Source .npy files contain {-1,+1} values; they are converted to {0,1}.
+    Source JPEGs are converted to {-1,+1} then mapped to {0,1}.
     """
-    npy_files = sorted(glob.glob(path_glob))
-    if not npy_files:
-        print("No patterns found in data/. Run generate_patterns.py first.")
-        sys.exit(1)
-
-    patterns = [state_ising_to_binary(np.load(f).ravel()) for f in npy_files]
-    N_SIDE = int(np.sqrt(len(patterns[0])))
-    assert N_SIDE * N_SIDE == len(patterns[0]), "patterns must be square"
-    N = N_SIDE * N_SIDE
-    print(f"Loaded {len(patterns)} patterns ({N_SIDE}x{N_SIDE}) from {npy_files}")
-    return patterns, N_SIDE, N
+    ising_patterns = load_patterns(n_side=n_side, data_dir=data_dir)
+    patterns = [state_ising_to_binary(p) for p in ising_patterns]
+    N = n_side * n_side
+    print(f"Loaded {len(patterns)} patterns ({n_side}x{n_side})")
+    return patterns, n_side, N
 
 
 def hebbian_weights(patterns, N):
