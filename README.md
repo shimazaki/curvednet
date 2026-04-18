@@ -96,19 +96,20 @@ Side-by-side comparison of recall dynamics across different `gamma_0` values.
 
 ### `gibbs_moments.py`
 
-Equilibrium-moment sampler. Drives `curvednet.iter_curved_glauber` as one long Markov chain of `N_SWEEPS` sweeps (each = N single-spin updates) and stream-accumulates
+Equilibrium-moment sampler. Cycles through all stored memory patterns, running one Markov-chain segment per pattern (initialized near that pattern with 30% noise). Each segment yields one snapshot per sweep of N single-spin updates, and moments
 
 ```
 eta_i  = <s_i>          (shape (N,))
 eta_ij = <s_i s_j>      (shape (N, N), float32)
 ```
 
-after a burn-in. CLI takes `gamma_0` as the first positional argument and `--size N` to set resolution (default 32).
+are stream-accumulated across all segments with no burn-in. CLI takes `gamma_0` as the first positional argument, `--size N` to set resolution (default 32), and `--patterns N` to set the number of stored patterns (default 2).
 
+- **Pattern cycling**: Total sweeps are divided into P segments (one per pattern). Each segment starts from the corresponding memory pattern with 30% random spin flips, ensuring the chain visits all attractors.
 - **Patterns**: converted from `data/*.jpg` at `N_SIDE x N_SIDE` (default 32×32, override with `--size`) so `eta_ij` stays a few MB
 - **Activation**: `ACTIVATION = "exact"` by default; set to `"approx"` for the large-N sigmoid
-- **Output**: `results/gibbs_moments_n{N}_g{+X.XX}.npz` containing `eta_i`, `eta_ij`, plus the config constants
-- **Parameters** (top of file): `BETA`, `N_SWEEPS`, `BURN_IN`, `SAMPLE_INTERVAL`, `SEED`
+- **Output**: `results/gibbs_moments_size{N}_p{P}_g{+X.XX}_s{S}.npz` containing `eta_i`, `eta_ij`, plus the config constants
+- **Parameters** (top of file): `BETA`, `N_SAMPLES`, `SAMPLE_INTERVAL`, `SEED`
 
 ## Binary encoding
 
