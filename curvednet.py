@@ -29,6 +29,7 @@ only under `if __name__ == "__main__":`.
 
 import sys
 
+import numba
 import numpy as np
 from PIL import Image
 
@@ -107,51 +108,114 @@ def activation_exact(h, *, beta, gamma_0, energy, N, s_i):
 
 _ACTIVATIONS = {"exact": activation_exact, "approx": activation_approx}
 
+# --- Numba JIT helpers -------------------------------------------------------
+
+_ACT_EXACT = 0
+_ACT_APPROX = 1
+
+
+@numba.njit(cache=True, fastmath=True)
+def _prob_stay_gamma_njit(z, gamma):
+    """JIT-compiled prob_stay_gamma."""
+    if abs(gamma) < 1e-12:
+        return 1.0 / (1.0 + np.exp(z))
+    inner = 1.0 + gamma * z
+    if inner <= 0.0:
+        return 1.0 if gamma > 0.0 else 0.0
+    log_expg = np.log(inner) / gamma
+    if log_expg > 700.0:
+        return 0.0
+    return 1.0 / (1.0 + np.exp(log_expg))
+
+
+@numba.njit(cache=True, fastmath=True)
+def _act_exact_njit(h, beta, gamma_0, energy, N, s_i):
+    """JIT-compiled exact activation (Ising)."""
+    if gamma_0 == 0.0:
+        return 0.5 * (1.0 + np.tanh(beta * h))
+    denom = 1.0 - gamma_0 * energy / N
+    beta_eff = beta / (denom if denom > 0 else 1e-8)
+    gamma_u = gamma_0 / (N * beta)
+    prob_stay = _prob_stay_gamma_njit(-2.0 * beta_eff * s_i * h, gamma_u)
+    return prob_stay if s_i > 0 else 1.0 - prob_stay
+
+
+@numba.njit(cache=True, fastmath=True)
+def _act_approx_njit(h, beta, gamma_0, energy, N, s_i):
+    """JIT-compiled approx activation (Ising)."""
+    if gamma_0 == 0.0:
+        return 0.5 * (1.0 + np.tanh(beta * h))
+    denom = 1.0 - gamma_0 * energy / N
+    beta_eff = beta / (denom if denom > 0 else 1e-8)
+    return 0.5 * (1.0 + np.tanh(beta_eff * h))
+
+
+@numba.njit(cache=True, fastmath=True)
+def _glauber_loop_njit(state, W, h_all, beta, gamma_0, n_steps,
+                       snapshot_interval, act_code, rng_seed, energy):
+    """Run the full Glauber loop in compiled code, return snapshot array."""
+    N = state.shape[0]
+    n_snapshots = n_steps // snapshot_interval
+    snapshots = np.empty((n_snapshots, N), dtype=np.float64)
+
+    np.random.seed(rng_seed)
+    snap_idx = 0
+    for step in range(1, n_steps + 1):
+        i = np.random.randint(0, N)
+        h = h_all[i]
+
+        if act_code == _ACT_EXACT:
+            prob_plus = _act_exact_njit(h, beta, gamma_0, energy, N, state[i])
+        else:
+            prob_plus = _act_approx_njit(h, beta, gamma_0, energy, N, state[i])
+
+        new_val = 1.0 if np.random.random() < prob_plus else -1.0
+
+        if new_val != state[i]:
+            delta = new_val - state[i]
+            energy -= delta * h
+            state[i] = new_val
+            for j in range(N):
+                h_all[j] += delta * W[i, j]
+
+        if step % snapshot_interval == 0:
+            snapshots[snap_idx] = state.copy()
+            snap_idx += 1
+
+    return snapshots
+
 
 def iter_curved_glauber(pattern, W, *, beta, gamma_0, n_steps, snapshot_interval,
                         noise_frac, rng, activation="exact"):
     """Generator of curved-Glauber state snapshots.
 
     Yields a fresh `state.copy()` first for the post-noise initial state,
-    then once per step that is a multiple of `snapshot_interval`. Peak
-    memory is O(N) (the one state array plus the per-yield copy), which
-    lets callers stream-accumulate moments without materialising the full
-    trajectory.
+    then once per step that is a multiple of `snapshot_interval`. The inner
+    loop is Numba JIT-compiled for performance.
 
     See `run_curved_glauber` for the semantics of `activation`.
     """
-    try:
-        act_fn = _ACTIVATIONS[activation]
-    except KeyError as exc:
+    if activation not in _ACTIVATIONS:
         raise ValueError(
             f"activation must be one of {sorted(_ACTIVATIONS)}, got {activation!r}"
-        ) from exc
+        )
+
+    act_code = _ACT_EXACT if activation == "exact" else _ACT_APPROX
 
     N = pattern.size
     state = pattern.copy()
     state[rng.choice(N, size=int(noise_frac * N), replace=False)] *= -1
 
-    # Initial energy: E = -0.5 * x^T W x
     energy = -0.5 * state @ W @ state
 
     yield state.copy()
-    for step in range(1, n_steps + 1):
-        i = rng.integers(N)
-        h = W[i] @ state
 
-        prob_plus = act_fn(
-            h, beta=beta, gamma_0=gamma_0, energy=energy, N=N, s_i=state[i],
-        )
-        new_val = 1.0 if rng.random() < prob_plus else -1.0
-
-        # Incremental energy update
-        if new_val != state[i]:
-            delta = new_val - state[i]
-            energy -= delta * h
-            state[i] = new_val
-
-        if step % snapshot_interval == 0:
-            yield state.copy()
+    h_all = W @ state
+    rng_seed = int(rng.integers(0, 2**31))
+    snapshots = _glauber_loop_njit(state, W, h_all, beta, gamma_0, n_steps,
+                                   snapshot_interval, act_code, rng_seed, energy)
+    for k in range(snapshots.shape[0]):
+        yield snapshots[k]
 
 
 def run_curved_glauber(pattern, W, *, beta, gamma_0, n_steps, snapshot_interval,
