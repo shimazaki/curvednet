@@ -18,5 +18,8 @@ data/*.npy
 data/*.png
 data/.cache/
 
+# Generated figures (EPS)
+fig/*.eps
+
 # Generated sampler outputs
 results/
