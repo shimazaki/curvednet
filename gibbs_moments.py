@@ -21,7 +21,19 @@ import sys
 import numpy as np
 from PIL import Image
 
-from curvednet import hebbian_weights, iter_curved_glauber
+# --- Parse --binary flag before positional args ---
+BINARY = "--binary" in sys.argv
+_argv = [a for a in sys.argv[1:] if a != "--binary"]
+
+from curvednet import hebbian_weights
+if BINARY:
+    from curvednet_binary import (
+        ising_to_binary,
+        state_ising_to_binary,
+        iter_curved_glauber as binary_iter,
+    )
+else:
+    from curvednet import iter_curved_glauber
 
 # --- Configuration ---
 GAMMA_0 = -0.3          # curvature gamma' (override via CLI: python gibbs_moments.py -0.3)
@@ -34,9 +46,10 @@ SEED = 42
 ACTIVATION = "exact"    # "exact" (paper S2.5) or "approx" (S2.7)
 
 OUT_DIR = "results"
-if len(sys.argv) > 1:
-    GAMMA_0 = float(sys.argv[1])
-OUT_PATH = os.path.join(OUT_DIR, f"gibbs_moments_g{GAMMA_0:+.2f}.npz")
+if _argv:
+    GAMMA_0 = float(_argv[0])
+_suffix = "_binary" if BINARY else ""
+OUT_PATH = os.path.join(OUT_DIR, f"gibbs_moments{_suffix}_g{GAMMA_0:+.2f}.npz")
 
 
 def load_and_downsample(path: str, n_side: int) -> np.ndarray:
@@ -61,23 +74,41 @@ def main() -> None:
     N = N_SIDE * N_SIDE
     print(f"Loaded {len(patterns)} patterns (downsampled to {N_SIDE}x{N_SIDE}) from {npy_files}")
 
-    W = hebbian_weights(patterns, N)
+    if BINARY:
+        W_s = hebbian_weights(patterns, N)
+        W, b = ising_to_binary(W_s)
+        patterns = [state_ising_to_binary(p) for p in patterns]
+    else:
+        W = hebbian_weights(patterns, N)
+        b = None
 
     rng = np.random.default_rng(SEED)
-    initial_state = rng.choice([-1.0, 1.0], size=N)
+    if BINARY:
+        initial_state = rng.choice([0.0, 1.0], size=N)
+    else:
+        initial_state = rng.choice([-1.0, 1.0], size=N)
 
     eta_i = np.zeros(N, dtype=np.float64)
     eta_ij = np.zeros((N, N), dtype=np.float32)
     n_samples = 0
 
-    print(f"Sampling: gamma_0={GAMMA_0}, beta={BETA}, sweeps={N_SWEEPS}, "
+    mode = "binary {0,1}" if BINARY else "Ising {-1,+1}"
+    print(f"Sampling ({mode}): gamma_0={GAMMA_0}, beta={BETA}, sweeps={N_SWEEPS}, "
           f"burn_in={BURN_IN}, activation={ACTIVATION}")
-    it = iter_curved_glauber(
-        initial_state, W,
-        beta=BETA, gamma_0=GAMMA_0,
-        n_steps=N * N_SWEEPS, snapshot_interval=N,
-        noise_frac=0.0, rng=rng, activation=ACTIVATION,
-    )
+    if BINARY:
+        it = binary_iter(
+            initial_state, W, b,
+            beta=BETA, gamma_0=GAMMA_0,
+            n_steps=N * N_SWEEPS, snapshot_interval=N,
+            noise_frac=0.0, rng=rng, activation=ACTIVATION,
+        )
+    else:
+        it = iter_curved_glauber(
+            initial_state, W,
+            beta=BETA, gamma_0=GAMMA_0,
+            n_steps=N * N_SWEEPS, snapshot_interval=N,
+            noise_frac=0.0, rng=rng, activation=ACTIVATION,
+        )
     next(it)  # discard the pre-sweep initial snapshot
     for sweep_idx, s in enumerate(it, start=1):
         if sweep_idx > BURN_IN and (sweep_idx - BURN_IN - 1) % SAMPLE_INTERVAL == 0:
