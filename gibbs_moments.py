@@ -19,9 +19,15 @@ import sys
 
 import numpy as np
 
-# --- Parse --binary flag before positional args ---
+# --- Parse flags before positional args ---
 BINARY = "--binary" in sys.argv
 _argv = [a for a in sys.argv[1:] if a != "--binary"]
+_size_argv = []
+for _i, _a in enumerate(_argv):
+    if _a == "--size" and _i + 1 < len(_argv):
+        _size_argv = [_argv[_i + 1]]
+        _argv = _argv[:_i] + _argv[_i + 2:]
+        break
 
 from curvednet import hebbian_weights
 from generate_patterns import load_patterns
@@ -37,7 +43,7 @@ else:
 # --- Configuration ---
 GAMMA_0 = -0.3          # curvature gamma' (override via CLI: python gibbs_moments.py -0.3)
 BETA = 1.5              # inverse temperature (matches compare_gamma.py)
-N_SIDE = 32             # downsample target
+N_SIDE = int(_size_argv[0]) if _size_argv else 32  # image side length (--size N)
 N_SWEEPS = 3000         # total sweeps (1 sweep = N single-spin updates)
 BURN_IN = 500           # sweeps discarded before accumulating moments
 SAMPLE_INTERVAL = 1     # sweeps between moment updates (thinning)
@@ -48,7 +54,7 @@ OUT_DIR = "results"
 if _argv:
     GAMMA_0 = float(_argv[0])
 _suffix = "_binary" if BINARY else ""
-OUT_PATH = os.path.join(OUT_DIR, f"gibbs_moments{_suffix}_g{GAMMA_0:+.2f}.npz")
+OUT_PATH = os.path.join(OUT_DIR, f"gibbs_moments{_suffix}_n{N_SIDE}_g{GAMMA_0:+.2f}.npz")
 
 
 def main() -> None:
