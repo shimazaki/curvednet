@@ -9,7 +9,8 @@ uv run python generate_patterns.py   # download & binarize images → data/*.npy
 uv run python example.py             # shortest end-to-end recall demo → fig/curved_recall.gif
 uv run python compare_gamma.py       # side-by-side gamma_0 comparison  → fig/compare_gamma.gif
 uv run python gibbs_moments.py -0.3  # equilibrium moments at gamma_0=-0.3 → results/*.npz
-uv run pytest                        # run the 37 unit tests
+uv run python curvednet_binary.py    # binary {0,1} recall demo           → fig/curved_recall_binary.gif
+uv run pytest                        # run the 80 unit tests
 ```
 
 ## Theory
@@ -107,16 +108,37 @@ after a burn-in. CLI takes `gamma_0` as the first argument (e.g. `gibbs_moments.
 - **Output**: `results/gibbs_moments_g{+X.XX,-X.XX}.npz` containing `eta_i`, `eta_ij`, plus the config constants
 - **Parameters** (top of file): `BETA`, `N_SWEEPS`, `BURN_IN`, `SAMPLE_INTERVAL`, `SEED`
 
+## Binary encoding
+
+`curvednet_binary.py` is a parallel module that uses {0, 1} binary neurons instead of {-1, +1} Ising spins. The energy function is:
+
+```
+E(x) = -0.5 x^T W x - b^T x
+```
+
+Translation functions convert parameters between the two encodings so both define the **same distribution** (up to a constant):
+
+| Function | Input | Output |
+|---|---|---|
+| `ising_to_binary(W_s)` | Ising weights W_s | `(W_x, b_x)` where `W_x = 4 W_s`, `b_i = -2 sum_j W_s[i,j]` |
+| `binary_to_ising(W_x, b_x)` | Binary weights + bias | Ising weights W_s (raises `ValueError` if b_x is inconsistent) |
+| `state_ising_to_binary(s)` | {-1,+1} state | {0,1} state via `(s+1)/2` |
+| `state_binary_to_ising(x)` | {0,1} state | {-1,+1} state via `2x-1` |
+
+Running `uv run python curvednet_binary.py` produces `fig/curved_recall_binary.gif`.
+
 ## File structure
 
 ```
 .
 ├── generate_patterns.py      # Download & binarize images
-├── curvednet.py              # Curved Hopfield module + single-run __main__
+├── curvednet.py              # Curved Hopfield module ({-1,+1} Ising spins)
+├── curvednet_binary.py       # Curved Hopfield module ({0,1} binary) + translation
 ├── compare_gamma.py          # Side-by-side gamma_0 comparison
 ├── gibbs_moments.py          # Equilibrium-moment Gibbs sampler
 ├── example.py                # Standalone end-to-end recall demo
 ├── test_curvednet.py         # pytest tests for curvednet
+├── test_curvednet_binary.py  # pytest tests for curvednet_binary
 ├── data/                     # Stored binary patterns (.npy, .png)
 ├── fig/                      # Generated GIFs
 ├── results/                  # Sampler outputs (.npz, gitignored)
