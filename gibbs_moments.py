@@ -23,11 +23,16 @@ import numpy as np
 BINARY = "--binary" in sys.argv
 _argv = [a for a in sys.argv[1:] if a != "--binary"]
 _size_argv = []
-for _i, _a in enumerate(_argv):
-    if _a == "--size" and _i + 1 < len(_argv):
-        _size_argv = [_argv[_i + 1]]
-        _argv = _argv[:_i] + _argv[_i + 2:]
-        break
+_samples_argv = []
+for _flag, _store in [("--size", "_size"), ("--samples", "_samples")]:
+    for _i, _a in enumerate(_argv):
+        if _a == _flag and _i + 1 < len(_argv):
+            if _flag == "--size":
+                _size_argv = [_argv[_i + 1]]
+            else:
+                _samples_argv = [_argv[_i + 1]]
+            _argv = _argv[:_i] + _argv[_i + 2:]
+            break
 
 from curvednet import hebbian_weights
 from generate_patterns import load_patterns
@@ -44,8 +49,9 @@ else:
 GAMMA_0 = -0.3          # curvature gamma' (override via CLI: python gibbs_moments.py -0.3)
 BETA = 1.5              # inverse temperature (matches compare_gamma.py)
 N_SIDE = int(_size_argv[0]) if _size_argv else 32  # image side length (--size N)
-N_SWEEPS = 3000         # total sweeps (1 sweep = N single-spin updates)
+N_SAMPLES = int(_samples_argv[0]) if _samples_argv else 2500  # desired post-burn-in samples
 BURN_IN = 500           # sweeps discarded before accumulating moments
+N_SWEEPS = N_SAMPLES + BURN_IN  # total sweeps (1 sweep = N single-spin updates)
 SAMPLE_INTERVAL = 1     # sweeps between moment updates (thinning)
 SEED = 42
 ACTIVATION = "exact"    # "exact" (paper S2.5) or "approx" (S2.7)
@@ -54,7 +60,7 @@ OUT_DIR = "results"
 if _argv:
     GAMMA_0 = float(_argv[0])
 _suffix = "_binary" if BINARY else ""
-OUT_PATH = os.path.join(OUT_DIR, f"gibbs_moments{_suffix}_n{N_SIDE}_g{GAMMA_0:+.2f}.npz")
+OUT_PATH = os.path.join(OUT_DIR, f"gibbs_moments{_suffix}_size{N_SIDE}_g{GAMMA_0:+.2f}_s{N_SAMPLES}.npz")
 
 
 def main() -> None:
