@@ -1,23 +1,17 @@
 """Gibbs sampler for the curved Hopfield model.
 
-Runs single-spin-flip dynamics with the gamma-deformed conditional
-
-    p_gamma(x_k | x_\\k) = 1 / (1 + exp_gamma(-2 beta'(x) x_k h_k)),
-
-where exp_gamma(z) = [1 + gamma z]_+^(1/gamma) is the gamma-exponential
-and beta'(x) = beta / [1 - gamma_0 * E(x) / N]_+ is the state-dependent
-effective inverse temperature. This recovers the standard Gibbs sigmoid
-(1 + tanh(beta'·h))/2 as gamma_0 -> 0 and matches Eq. (8) of Aguilera et
-al. (Nat. Commun. 2025).
-
-Accumulates equilibrium moments
+Drives `curvednet.iter_curved_glauber` as a single long Markov chain (one
+snapshot per sweep of N single-spin updates) and stream-accumulates
+equilibrium moments
 
     eta_i  = <s_i>
     eta_ij = <s_i s_j>
 
-from samples collected after a burn-in. Patterns are downsampled from the
-128x128 .npy files in data/ to N_SIDE x N_SIDE so that eta_ij fits
-comfortably in memory (N_SIDE=32 -> ~4 MB float32).
+from samples collected after a burn-in. The `ACTIVATION` constant selects
+the exact deformed conditional (paper S2.5, default) or the large-N
+approximation (S2.7). Patterns are downsampled from the 128x128 .npy files
+in data/ to N_SIDE x N_SIDE so that eta_ij fits comfortably in memory
+(N_SIDE=32 -> ~4 MB float32).
 """
 
 import glob
@@ -27,7 +21,7 @@ import sys
 import numpy as np
 from PIL import Image
 
-from curvednet import prob_stay_gamma
+from curvednet import hebbian_weights, iter_curved_glauber
 
 # --- Configuration ---
 GAMMA_0 = -0.3          # curvature gamma' (override via CLI: python gibbs_moments.py -0.3)
@@ -37,6 +31,7 @@ N_SWEEPS = 3000         # total sweeps (1 sweep = N single-spin updates)
 BURN_IN = 500           # sweeps discarded before accumulating moments
 SAMPLE_INTERVAL = 1     # sweeps between moment updates (thinning)
 SEED = 42
+ACTIVATION = "exact"    # "exact" (paper S2.5) or "approx" (S2.7)
 
 OUT_DIR = "results"
 if len(sys.argv) > 1:
@@ -66,39 +61,31 @@ def main() -> None:
     N = N_SIDE * N_SIDE
     print(f"Loaded {len(patterns)} patterns (downsampled to {N_SIDE}x{N_SIDE}) from {npy_files}")
 
-    W = sum(np.outer(xi, xi) for xi in patterns) / N
-    np.fill_diagonal(W, 0.0)
+    W = hebbian_weights(patterns, N)
 
     rng = np.random.default_rng(SEED)
-    state = rng.choice([-1.0, 1.0], size=N)
-    energy = -0.5 * state @ W @ state
+    initial_state = rng.choice([-1.0, 1.0], size=N)
 
     eta_i = np.zeros(N, dtype=np.float64)
     eta_ij = np.zeros((N, N), dtype=np.float32)
     n_samples = 0
 
-    gamma_u = GAMMA_0 / (N * BETA)  # unscaled gamma entering exp_gamma
-
-    print(f"Sampling: gamma_0={GAMMA_0}, beta={BETA}, sweeps={N_SWEEPS}, burn_in={BURN_IN}")
-    for sweep in range(N_SWEEPS):
-        for _ in range(N):
-            i = rng.integers(N)
-            h = W[i] @ state
-            denom = 1.0 - GAMMA_0 * energy / N
-            beta_eff = BETA / max(denom, 1e-8)
-            prob_stay = prob_stay_gamma(-2.0 * beta_eff * state[i] * h, gamma_u)
-            if rng.random() >= prob_stay:
-                delta = -2.0 * state[i]
-                energy -= delta * h
-                state[i] = -state[i]
-
-        if sweep >= BURN_IN and (sweep - BURN_IN) % SAMPLE_INTERVAL == 0:
-            eta_i += state
-            eta_ij += np.outer(state, state).astype(np.float32)
+    print(f"Sampling: gamma_0={GAMMA_0}, beta={BETA}, sweeps={N_SWEEPS}, "
+          f"burn_in={BURN_IN}, activation={ACTIVATION}")
+    it = iter_curved_glauber(
+        initial_state, W,
+        beta=BETA, gamma_0=GAMMA_0,
+        n_steps=N * N_SWEEPS, snapshot_interval=N,
+        noise_frac=0.0, rng=rng, activation=ACTIVATION,
+    )
+    next(it)  # discard the pre-sweep initial snapshot
+    for sweep_idx, s in enumerate(it, start=1):
+        if sweep_idx > BURN_IN and (sweep_idx - BURN_IN - 1) % SAMPLE_INTERVAL == 0:
+            eta_i += s
+            eta_ij += np.outer(s, s).astype(np.float32)
             n_samples += 1
-
-        if (sweep + 1) % 100 == 0:
-            print(f"  sweep {sweep + 1}/{N_SWEEPS}  samples={n_samples}  E={energy:.2f}")
+        if sweep_idx % 100 == 0:
+            print(f"  sweep {sweep_idx}/{N_SWEEPS}  samples={n_samples}")
 
     eta_i /= n_samples
     eta_ij /= n_samples

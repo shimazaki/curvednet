@@ -7,6 +7,7 @@ from curvednet import (
     activation_approx,
     activation_exact,
     hebbian_weights,
+    iter_curved_glauber,
     prob_stay_gamma,
     run_curved_glauber,
     snap_to_image,
@@ -170,6 +171,30 @@ def test_run_curved_glauber_exact_and_approx_agree_at_gamma_zero():
     snaps_ex = _toy_run("exact", gamma_0=0.0, seed=7)
     snaps_ap = _toy_run("approx", gamma_0=0.0, seed=7)
     for a, b in zip(snaps_ex, snaps_ap):
+        assert np.array_equal(a, b)
+
+
+def test_iter_and_run_equivalent():
+    """run_curved_glauber is a list wrapper around iter_curved_glauber; same
+    seed => byte-identical snapshot sequence."""
+    N = 16
+    pattern = np.random.default_rng(99).choice([-1.0, 1.0], size=N)
+    W = hebbian_weights([pattern], N)
+
+    rng_list = np.random.default_rng(123)
+    snaps_list = run_curved_glauber(
+        pattern, W, beta=1.0, gamma_0=-0.3, n_steps=200,
+        snapshot_interval=50, noise_frac=0.3, rng=rng_list, activation="exact",
+    )
+
+    rng_iter = np.random.default_rng(123)
+    snaps_iter = list(iter_curved_glauber(
+        pattern, W, beta=1.0, gamma_0=-0.3, n_steps=200,
+        snapshot_interval=50, noise_frac=0.3, rng=rng_iter, activation="exact",
+    ))
+
+    assert len(snaps_list) == len(snaps_iter)
+    for a, b in zip(snaps_list, snaps_iter):
         assert np.array_equal(a, b)
 
 

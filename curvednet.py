@@ -16,9 +16,13 @@ Two single-spin activation rules are provided:
 the default is the exact rule.
 
 Module-level exports (`load_square_patterns`, `hebbian_weights`,
-`run_curved_glauber`, `snap_to_image`, `activation_exact`,
-`activation_approx`, `prob_stay_gamma`) are importable with no side effects.
-Display + GIF output runs only under `if __name__ == "__main__":`.
+`run_curved_glauber`, `iter_curved_glauber`, `snap_to_image`,
+`activation_exact`, `activation_approx`, `prob_stay_gamma`) are importable
+with no side effects. `iter_curved_glauber` is a generator variant that
+yields state snapshots one at a time so callers can stream-accumulate
+moments without materialising the full trajectory; `run_curved_glauber` is
+a thin `list(iter_curved_glauber(...))` wrapper. Display + GIF output runs
+only under `if __name__ == "__main__":`.
 """
 
 import glob
@@ -108,20 +112,17 @@ def activation_exact(h, *, beta, gamma_0, energy, N, s_i):
 _ACTIVATIONS = {"exact": activation_exact, "approx": activation_approx}
 
 
-def run_curved_glauber(pattern, W, *, beta, gamma_0, n_steps, snapshot_interval,
-                       noise_frac, rng, activation="exact"):
-    """Run a curved-Glauber Markov chain from a noisy version of `pattern`.
+def iter_curved_glauber(pattern, W, *, beta, gamma_0, n_steps, snapshot_interval,
+                        noise_frac, rng, activation="exact"):
+    """Generator of curved-Glauber state snapshots.
 
-    Single-spin-flip updates of an Ising state in {-1, +1}^N using one of two
-    conditional rules:
+    Yields a fresh `state.copy()` first for the post-noise initial state,
+    then once per step that is a multiple of `snapshot_interval`. Peak
+    memory is O(N) (the one state array plus the per-yield copy), which
+    lets callers stream-accumulate moments without materialising the full
+    trajectory.
 
-    - activation="exact"  (default) — eq. S2.5, logistic of the deformed
-      exponential.
-    - activation="approx"           — eq. S2.7, sigma(2*beta_eff*h); large-N
-      limit of the exact rule.
-
-    Returns a list of raw state snapshots (numpy arrays) captured every
-    `snapshot_interval` steps.
+    See `run_curved_glauber` for the semantics of `activation`.
     """
     try:
         act_fn = _ACTIVATIONS[activation]
@@ -137,7 +138,7 @@ def run_curved_glauber(pattern, W, *, beta, gamma_0, n_steps, snapshot_interval,
     # Initial energy: E = -0.5 * x^T W x
     energy = -0.5 * state @ W @ state
 
-    snapshots = [state.copy()]
+    yield state.copy()
     for step in range(1, n_steps + 1):
         i = rng.integers(N)
         h = W[i] @ state
@@ -154,8 +155,29 @@ def run_curved_glauber(pattern, W, *, beta, gamma_0, n_steps, snapshot_interval,
             state[i] = new_val
 
         if step % snapshot_interval == 0:
-            snapshots.append(state.copy())
-    return snapshots
+            yield state.copy()
+
+
+def run_curved_glauber(pattern, W, *, beta, gamma_0, n_steps, snapshot_interval,
+                       noise_frac, rng, activation="exact"):
+    """Run a curved-Glauber Markov chain from a noisy version of `pattern`.
+
+    Single-spin-flip updates of an Ising state in {-1, +1}^N using one of two
+    conditional rules:
+
+    - activation="exact"  (default) — eq. S2.5, logistic of the deformed
+      exponential.
+    - activation="approx"           — eq. S2.7, sigma(2*beta_eff*h); large-N
+      limit of the exact rule.
+
+    Returns a list of raw state snapshots (numpy arrays) captured every
+    `snapshot_interval` steps. Thin wrapper around `iter_curved_glauber`.
+    """
+    return list(iter_curved_glauber(
+        pattern, W, beta=beta, gamma_0=gamma_0, n_steps=n_steps,
+        snapshot_interval=snapshot_interval, noise_frac=noise_frac, rng=rng,
+        activation=activation,
+    ))
 
 
 if __name__ == "__main__":

@@ -5,8 +5,11 @@ Hopfield network simulations with curved (deformed) dynamics based on [Aguilera 
 ## Quickstart
 
 ```bash
-uv run python generate_patterns.py   # download & binarize images
-uv run python compare_gamma.py       # produce side-by-side comparison GIF
+uv run python generate_patterns.py   # download & binarize images → data/*.npy
+uv run python example.py             # shortest end-to-end recall demo → fig/curved_recall.gif
+uv run python compare_gamma.py       # side-by-side gamma_0 comparison  → fig/compare_gamma.gif
+uv run python gibbs_moments.py -0.3  # equilibrium moments at gamma_0=-0.3 → results/*.npz
+uv run pytest                        # run the 37 unit tests
 ```
 
 ## Theory
@@ -25,22 +28,24 @@ where `E(x) = -0.5 * x^T W x` is the Ising energy and `[...]+ = max(..., eps)` i
 | `= 0`  | Standard Hopfield/Ising model (constant beta) |
 | `> 0`  | Decelerates dynamics, potentially more robust retrieval |
 
-The local field for neuron `i` is `h_i = sum_j W_ij * s_j`, computed as `W[i] @ state`. Two activation rules are used in this repo:
+The local field for neuron `i` is `h_i = sum_j W_ij * s_j`, computed as `W[i] @ state`. Two single-spin activation rules are available in `curvednet.py` and selectable via `run_curved_glauber(..., activation=...)`. The default is the **exact** rule.
 
-- **Mean-field-style (`curvednet.py`, `compare_gamma.py`):** standard sigmoid driven by the effective inverse temperature,
-
-    ```
-    P(s_i = +1) = (1 + tanh(beta_eff * h_i)) / 2
-    ```
-
-- **Gamma-deformed conditional (`gibbs_moments.py`, Eq. 8 of Aguilera et al.):** samples `s_i` via the γ-exponential of the energy change for a flip,
+- **Exact deformed conditional (default, paper Supp. Note 2 Eq. S2.5):** logistic of the gamma-exponential of the energy change for a flip,
 
     ```
     P(s_i stays) = 1 / (1 + exp_gamma(-2 * beta_eff * s_i * h_i))
     exp_gamma(z) = [1 + gamma * z]_+^(1/gamma),   gamma = gamma_0 / (N * beta)
     ```
 
-    which reduces to the mean-field sigmoid as `gamma_0 -> 0` and matches the exact conditional of the curved joint distribution `p_gamma(x) propto [1 - gamma * beta * E(x)]_+^(1/gamma)`.
+    matches the exact conditional of the curved joint distribution `p_gamma(x) propto [1 - gamma * beta * E(x)]_+^(1/gamma)`. Reduces to the sigmoid below as `gamma_0 -> 0`.
+
+- **Large-N approximation (paper Eq. S2.7), `activation="approx"`:** sigmoid driven by the effective inverse temperature,
+
+    ```
+    P(s_i = +1) = (1 + tanh(beta_eff * h_i)) / 2
+    ```
+
+    obtained by letting `gamma -> 0` with `gamma' = gamma * N` fixed. Differs from the exact rule only near the support boundary `|gamma_0 * E / N| -> 1`.
 
 ## Scripts
 
@@ -52,14 +57,26 @@ Downloads public-domain images from Wikimedia Commons and converts them to 128x1
 - **Output**: `data/*.npy` (binary patterns), `data/*.png` (previews)
 - **Method**: Grayscale conversion, resize to 128x128, median-threshold binarization
 
+### `example.py`
+
+Shortest end-to-end pipeline (≈60 lines of code) — standalone, no project imports. Loads `data/*.npy`, builds the Hebbian matrix, runs a curved-Glauber Markov chain for each pattern with the exact deformed conditional, and writes `fig/curved_recall.gif`. Byte-identical to `curvednet.py`'s output under the same seed.
+
 ### `curvednet.py`
 
-Single-run curved Hopfield network with configurable `gamma_0`.
+Curved Hopfield module. Importable helpers at module level (no side effects):
 
-- **Key addition**: State-dependent `beta_eff` via the curvature formula
-- **Energy tracking**: Incremental energy updates for efficiency (`energy -= delta * h`)
-- **Parameters**: `beta=3.0`, `gamma_0=-1.2`, `N_STEPS=80000`
-- **Output**: `fig/curved_recall.gif`
+| Export | Purpose |
+|---|---|
+| `load_square_patterns` | glob + sorted-load `data/*.npy`, return `(patterns, N_SIDE, N)` |
+| `hebbian_weights`      | `(1/N) sum_k x_k x_k^T` with zero diagonal |
+| `snap_to_image`        | render a ±1 state as an upscaled grayscale PIL image |
+| `prob_stay_gamma`      | `1 / (1 + exp_gamma(z))` — the γ-logistic primitive |
+| `activation_exact`     | exact S2.5 conditional, `P(s_i=+1 \| rest)` |
+| `activation_approx`    | approximate S2.7 conditional (large-N sigmoid) |
+| `iter_curved_glauber`  | **generator** yielding state snapshots one at a time (O(N) peak memory) |
+| `run_curved_glauber`   | thin list wrapper: `list(iter_curved_glauber(...))` |
+
+Running the file directly (`uv run python curvednet.py`) executes the single-run demo with `beta=3.0`, `gamma_0=-1.2`, `N_STEPS=80000` and writes `fig/curved_recall.gif`.
 
 ### `compare_gamma.py`
 
@@ -74,23 +91,39 @@ Side-by-side comparison of recall dynamics across different `gamma_0` values.
   - `N_STEPS`: number of single-spin-flip updates (default: `100000`)
   - `NOISE_FRAC`: fraction of spins flipped in initial state (default: `0.30`)
 
+### `gibbs_moments.py`
+
+Equilibrium-moment sampler. Drives `curvednet.iter_curved_glauber` as one long Markov chain of `N_SWEEPS` sweeps (each = N single-spin updates) and stream-accumulates
+
+```
+eta_i  = <s_i>          (shape (N,))
+eta_ij = <s_i s_j>      (shape (N, N), float32)
+```
+
+after a burn-in. CLI takes `gamma_0` as the first argument (e.g. `gibbs_moments.py -0.3`).
+
+- **Patterns**: downsampled from `data/*.npy` to `N_SIDE x N_SIDE` (default 32×32) so `eta_ij` stays a few MB
+- **Activation**: `ACTIVATION = "exact"` by default; set to `"approx"` for the large-N sigmoid
+- **Output**: `results/gibbs_moments_g{+X.XX,-X.XX}.npz` containing `eta_i`, `eta_ij`, plus the config constants
+- **Parameters** (top of file): `BETA`, `N_SWEEPS`, `BURN_IN`, `SAMPLE_INTERVAL`, `SEED`
+
 ## File structure
 
 ```
 .
 ├── generate_patterns.py      # Download & binarize images
-├── hopfield_ising_1simple.py # Deterministic Hopfield (32x32, procedural)
-├── hopfield_ising_2noisy.py  # Stochastic Hopfield (32x32, procedural)
-├── hopfield_ising.py         # Stochastic Hopfield (128x128, real images)
-├── curvednet.py              # Curved Hopfield, single gamma_0
+├── curvednet.py              # Curved Hopfield module + single-run __main__
 ├── compare_gamma.py          # Side-by-side gamma_0 comparison
-├── data/
-│   ├── .cache/               # Raw downloaded images
-│   ├── great_wave.npy        # Binary pattern
-│   ├── great_wave.png        # Preview
-│   ├── mona_lisa.npy
-│   └── mona_lisa.png
-└── pyproject.toml
+├── gibbs_moments.py          # Equilibrium-moment Gibbs sampler
+├── example.py                # Standalone end-to-end recall demo
+├── test_curvednet.py         # pytest tests for curvednet
+├── data/                     # Stored binary patterns (.npy, .png)
+├── fig/                      # Generated GIFs
+├── results/                  # Sampler outputs (.npz, gitignored)
+├── ref/                      # Reference paper PDF
+├── tmp/                      # Older pedagogical Hopfield scripts
+├── pyproject.toml
+└── uv.lock
 ```
 
 ## Dependencies
@@ -98,6 +131,6 @@ Side-by-side comparison of recall dynamics across different `gamma_0` values.
 - Python >= 3.8
 - numpy
 - Pillow
-- matplotlib (unused by core scripts, available for analysis)
+- matplotlib (available for downstream analysis; unused by core scripts)
 
-Install with `uv sync` or `pip install -e .`.
+Install with `uv sync`. Dev tools (`pytest`) live under `[dependency-groups] dev` in `pyproject.toml`; bring them in with `uv sync --dev` and run `uv run pytest`.
