@@ -7,6 +7,8 @@ Computation is reused from `curvednet`: `load_square_patterns`,
 `hebbian_weights`, `run_cycle`, `snap_to_image`. Only the display-specific
 helpers (`_load_font`, `compose_frame`) and the outer multi-gamma / pattern
 driver live here, and all display/I-O runs under `__main__`.
+
+CLI usage:  python compare_gamma.py [--size N]   (default 128×128)
 """
 
 import numpy as np
@@ -49,6 +51,16 @@ def compose_frame(images, gammas, beta, img_size, label_height, gap):
 
 
 if __name__ == "__main__":
+    import sys
+
+    # --- Parse --size flag ---
+    _argv = sys.argv[1:]
+    _N_SIDE_ARG = 128
+    for _i, _a in enumerate(_argv):
+        if _a == "--size" and _i + 1 < len(_argv):
+            _N_SIDE_ARG = int(_argv[_i + 1])
+            break
+
     # --- Configuration ---
     GAMMAS = [0.0, -2.0]
     NOISE_FRAC = 0.30
@@ -59,7 +71,7 @@ if __name__ == "__main__":
     LABEL_HEIGHT = 44  # pixels for the gamma label strip
     GAP = 64           # pixels between columns
 
-    patterns, N_SIDE, N = load_square_patterns()
+    patterns, N_SIDE, N = load_square_patterns(n_side=_N_SIDE_ARG)
     IMG_SIZE = N_SIDE * DISPLAY_SCALE
     W = hebbian_weights(patterns, N)
 

@@ -7,10 +7,11 @@ Hopfield network simulations with curved (deformed) dynamics based on [Aguilera 
 ```bash
 uv run python generate_patterns.py   # download source images → data/*.jpg
 uv run python example.py             # shortest end-to-end recall demo → fig/curved_recall.gif
-uv run python compare_gamma.py       # side-by-side gamma_0 comparison  → fig/compare_gamma.gif
+uv run python curvednet.py --size 64             # Ising recall demo at 64×64
+uv run python compare_gamma.py --size 64         # side-by-side gamma_0 comparison at 64×64
 uv run python gibbs_moments.py -0.3              # equilibrium moments (32×32) → results/*.npz
 uv run python gibbs_moments.py --size 16 -0.3    # at 16×16 resolution
-uv run python curvednet_binary.py    # binary {0,1} recall demo           → fig/curved_recall_binary.gif
+uv run python curvednet_binary.py --size 64      # binary {0,1} recall demo at 64×64
 uv run pytest                        # run the 80 unit tests
 ```
 
@@ -77,7 +78,7 @@ Curved Hopfield module. Importable helpers at module level (no side effects):
 | `iter_curved_glauber`  | **generator** yielding state snapshots one at a time (O(N) peak memory) |
 | `run_curved_glauber`   | thin list wrapper: `list(iter_curved_glauber(...))` |
 
-Running the file directly (`uv run python curvednet.py`) executes the single-run demo with `beta=3.0`, `gamma_0=-1.2`, `N_STEPS=80000` and writes `fig/curved_recall.gif`.
+Running the file directly (`uv run python curvednet.py`) executes the single-run demo with `beta=3.0`, `gamma_0=-1.2`, `N_STEPS=80000` and writes `fig/curved_recall.gif`. Use `--size N` to set pattern resolution (default 128).
 
 ### `compare_gamma.py`
 
@@ -86,6 +87,7 @@ Side-by-side comparison of recall dynamics across different `gamma_0` values.
 - **Comparison**: Runs multiple `gamma_0` values from identical noisy initial states
 - **RNG synchronization**: Captures and restores RNG state so all runs share the same initial noise
 - **Output**: `fig/compare_gamma.gif` with labeled columns (shows beta and gamma')
+- **CLI**: `--size N` sets pattern resolution (default 128)
 - **Parameters** (edit at top of file):
   - `GAMMAS`: list of gamma_0 values to compare (default: `[0.0, -2.0]`)
   - `BETA`: inverse temperature (default: `1.5`)
@@ -125,7 +127,7 @@ Translation functions convert parameters between the two encodings so both defin
 | `state_ising_to_binary(s)` | {-1,+1} state | {0,1} state via `(s+1)/2` |
 | `state_binary_to_ising(x)` | {0,1} state | {-1,+1} state via `2x-1` |
 
-Running `uv run python curvednet_binary.py` produces `fig/curved_recall_binary.gif`.
+Running `uv run python curvednet_binary.py` produces `fig/curved_recall_binary.gif`. Use `--size N` to set pattern resolution (default 128).
 
 ## File structure
 

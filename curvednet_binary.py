@@ -12,6 +12,8 @@ With the mapping s = 2x - 1 and Ising energy E_s = -0.5 s^T W_s s:
 
 Module-level exports are importable with no side effects. Display + GIF
 output runs only under `if __name__ == "__main__":`.
+
+CLI usage:  python curvednet_binary.py [--size N]   (default 128×128)
 """
 
 import sys
@@ -203,6 +205,16 @@ def run_curved_glauber(pattern, W, b, *, beta, gamma_0, n_steps,
 
 
 if __name__ == "__main__":
+    import sys
+
+    # --- Parse --size flag ---
+    _argv = sys.argv[1:]
+    _N_SIDE_ARG = 128
+    for _i, _a in enumerate(_argv):
+        if _a == "--size" and _i + 1 < len(_argv):
+            _N_SIDE_ARG = int(_argv[_i + 1])
+            break
+
     # --- Parameters ---
     NOISE_FRAC = 0.30
     N_STEPS = 80000
@@ -217,7 +229,7 @@ if __name__ == "__main__":
         hebbian_weights as ising_hebbian,
     )
 
-    ising_patterns, N_SIDE, N = ising_load()
+    ising_patterns, N_SIDE, N = ising_load(n_side=_N_SIDE_ARG)
     W_s = ising_hebbian(ising_patterns, N)
     W, b = ising_to_binary(W_s)
     patterns = [state_ising_to_binary(p) for p in ising_patterns]

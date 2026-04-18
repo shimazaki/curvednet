@@ -13,6 +13,8 @@ Two single-spin activation rules are provided:
 - `activation_exact`  — exact deformed conditional (paper eq. S2.5).
 - `activation_approx` — large-N Glauber approximation (paper eq. S2.7).
 `run_curved_glauber(..., activation="exact")` dispatches between them;
+
+CLI usage:  python curvednet.py [--size N]   (default 128×128)
 the default is the exact rule.
 
 Module-level exports (`load_square_patterns`, `hebbian_weights`,
@@ -175,6 +177,14 @@ def run_curved_glauber(pattern, W, *, beta, gamma_0, n_steps, snapshot_interval,
 
 
 if __name__ == "__main__":
+    # --- Parse --size flag ---
+    _argv = sys.argv[1:]
+    _N_SIDE_ARG = 128
+    for _i, _a in enumerate(_argv):
+        if _a == "--size" and _i + 1 < len(_argv):
+            _N_SIDE_ARG = int(_argv[_i + 1])
+            break
+
     # --- Parameters ---
     NOISE_FRAC = 0.30
     N_STEPS = 80000
@@ -184,7 +194,7 @@ if __name__ == "__main__":
     gamma_0 = -1.2      # curvature: <0 accelerates, 0 = standard, >0 decelerates
     RNG = np.random.default_rng(42)
 
-    patterns, N_SIDE, N = load_square_patterns()
+    patterns, N_SIDE, N = load_square_patterns(n_side=_N_SIDE_ARG)
     W = hebbian_weights(patterns, N)
 
     frames = []
